@@ -147,7 +147,7 @@ public sealed class NotificationConsumerService : BackgroundService
                     .Where(st => st.AvailableGasoline.Any()).OrderBy(st => st.Id).ToList();
 
                 var alertSb = new StringBuilder();
-                alertSb.AppendLine($" Доступность бензина на АЗС [{regionName}]");
+                //alertSb.AppendLine($" Доступность бензина на АЗС [{regionName}]");
                 alertSb.AppendLine("============================");
                 alertSb.AppendLine();
 
