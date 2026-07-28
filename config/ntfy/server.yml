@@ -1,0 +1,5 @@
+auth-default-access: "deny-all"
+
+auth-users:
+  # проверенный bcrypt-хэш для пароля SecureAdminPassword2026
+  - "admin:$2a$10$f6B0y1GjW.Dsz2/bKkX3wO9Ww67X0fshb42pXgS2LgM3l8ZfN7M2G:admin"

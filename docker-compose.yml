@@ -1,0 +1,246 @@
+services:
+  # 1. Аналитическая СУБД с открытым сетевым доступом
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: sberazs-clickhouse
+    ports:
+      - "8123:8123"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=sberazs_pass
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+    restart: always
+    networks:
+      - monitoring-network
+
+  # 2. Брокер сообщений
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: sberazs-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: always
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - monitoring-network
+
+  # сервер ntfy
+  ntfy-server:
+    image: binwiederhier/ntfy:latest
+    container_name: sberazs-ntfy-server
+    # ЖЕСТКИЙ ЗАПУСК СЛУЖБЫ: Флаг serve обязателен для работы бутстрапа
+    command: serve
+    environment:
+      - NTFY_BASE_URL=http://ntfy-server
+      # АВТОМАТИКА (Официальный бутстрап): ntfy сам создаст запись в auth.db при старте
+      - NTFY_BOOTSTRAP_USER=admin
+      - NTFY_BOOTSTRAP_PASSWORD=SecureAdminPassword2026
+    volumes:
+      - ntfy-data:/var/lib/ntfy
+      - ./config/ntfy/server.yml:/etc/ntfy/server.yml:ro
+    ports:
+      - "8083:80"
+    restart: always
+    networks:
+      monitoring-network:
+        aliases:
+          - ntfy-server
+
+
+
+  # 3. Воркер записи (Переведен на авторизацию с паролем)
+  clickhouse-worker:
+    image: sberazs-clickhouse-worker:latest
+    build:
+      context: .
+      dockerfile: src/ClickHouseWorker/Dockerfile
+    container_name: sberazs-ch-worker
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      - WorkerSettings__ClickHouseConnectionString=Host=clickhouse;Port=8123;Database=default;User=default;Password=sberazs_pass
+      - WorkerSettings__KafkaBootstrapServers=kafka:29092
+      - WorkerSettings__KafkaConsumerGroupId=clickhouse-shared-writer-group
+      - WorkerSettings__KafkaTopicsToListen=fuel-snapshots-pskov,fuel-snapshots-novgorod
+    restart: always
+    networks:
+      - monitoring-network
+
+  # 4. Воркер уведомлений (Слушает шину и шлет пуши по Regex)
+  notification-worker:
+    build:
+      context: .
+      dockerfile: src/NotificationWorker/Dockerfile
+    container_name: sberazs-ntfy-worker
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - NotificationWorkerOptions__KafkaBootstrapServers=kafka:29092
+      - NotificationWorkerOptions__KafkaConsumerGroupId=sberazs-notification-worker-group
+      - NotificationWorkerOptions__KafkaTopicsToListen=fuel-snapshots-pskov,fuel-snapshots-novgorod,tenant-configuration-events
+      # Переключаем только воркер на публичный сервер ntfy
+      # Если нужен локальный сервер, то пишем сюда значение из NTFY_BASE_URL сервиса ntfy-server (http://ntfy-server).
+      - NotificationWorkerOptions__NtfyBaseUrl=https://ntfy.sh
+      - NotificationWorkerOptions__NtfyAdminUser=admin
+      - NotificationWorkerOptions__NtfyAdminPassword=SecureAdminPassword2026
+    restart: always
+    networks:
+      - monitoring-network
+
+
+
+  # 5. API Пскова
+  monitoring-pskov:
+    image: sberazs-monitoring-app:latest
+    build:
+      context: .
+      dockerfile: src/WebApi/Dockerfile
+    container_name: sberazs-mon-pskov
+    ports:
+      - "5001:8080" # Маппим внутренний порт 8080 на внешний порт 5001 хоста
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - RegionSettings__Name=Псков
+      - RegionSettings__SberAzsEndpoint=https://sberazs.ru/api/stations?bbox=27.683860158543865,57.580268496165296,28.76415734982121,58.05622369337155
+      - RegionSettings__KafkaBootstrapServers=kafka:29092
+      - RegionSettings__KafkaTopicName=fuel-snapshots-pskov
+      - RegionSettings__NtfyBaseUrl=http://ntfy-server
+    restart: always
+    networks:
+      - monitoring-network
+
+  # 6. API Новгорода
+  monitoring-novgorod:
+    image: sberazs-monitoring-app:latest
+    build:
+      context: .
+      dockerfile: src/WebApi/Dockerfile
+    container_name: sberazs-mon-novgorod
+    ports:
+      - "5002:8080" # Маппим внутренний порт 8080 на внешний порт 5002 хоста
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - RegionSettings__Name=Новгород
+      - RegionSettings__SberAzsEndpoint=https://sberazs.ru/api/stations?bbox=30.83724408847928,58.19113685295622,31.817773911449827,58.87074245113074
+      - RegionSettings__KafkaBootstrapServers=kafka:29092
+      - RegionSettings__KafkaTopicName=fuel-snapshots-novgorod
+      - RegionSettings__NtfyBaseUrl=http://ntfy-server
+    restart: always
+    networks:
+      - monitoring-network
+
+  # 7. ЕДИНЫЙ API GATEWAY:Reverse Proxy для объединения портов)
+  api-gateway:
+    image: sberazs-api-gateway:latest
+    build:
+      context: .
+      dockerfile: src/ApiGateway/Dockerfile
+    container_name: sberazs-gateway
+    ports:
+      - "5000:8080"
+    restart: always
+    networks:
+      - monitoring-network
+
+  # 7. Панель управления (Микросервис Dashboard API на Minimal API)
+  sberazs-dashboard-api:
+    image: sberazs-dashboard-api:latest
+    build:
+      context: .
+      dockerfile: src/SberAzsMonitoring.Dashboard.Api/Dockerfile
+    container_name: sberazs-dashboard-api
+    ports:
+      - "5003:8080"
+    depends_on:
+      - sberazs-postgres
+      - kafka # <-- ДОБАВЛЕНО: Ждем старта Kafka
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DashboardDb=Host=sberazs-postgres;Port=5432;Database=sberazs_dashboard_db;Username=postgres;Password=your_secure_db_password_here;
+      # КОНФИГУРАЦИЯ KAFKA ДЛЯ СИНХРОНИЗАЦИИ ФИРМ
+      # Задайте имя переменной окружения в соответствии с тем, как она читается в вашей AddDashboardInfrastructure 
+      # (например, KafkaSettings__BootstrapServers или KafkaBootstrapServers)
+      - KafkaSettings__BootstrapServers=kafka:29092
+      - IdentitySettings__EnableManagementFeatures=true
+      - IdentitySettings__SeedAdminLogin=admin
+      - IdentitySettings__SeedAdminPassword=SecureAdminPassword2026!
+      - CryptoSettings__MasterKey=YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY=
+      - CryptoSettings__InitializationVector=YWJjZGVmZ2hpamtsbW5vcA==
+    restart: always
+    networks:
+      - monitoring-network
+
+
+
+  # 8. Реляционная СУБД для хранения настроек Дашборда (Enterprise Production)
+  sberazs-postgres:
+    image: postgres:16-alpine
+    container_name: sberazs-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_secure_db_password_here
+      POSTGRES_DB: sberazs_dashboard_db
+      LANG: ru_RU.UTF-8
+      POSTGRES_INITDB_ARGS: --encoding=UTF8 --lc-collate=C --lc-ctype=C.UTF-8
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - monitoring-network
+
+  # # Туннель наружу (ТОЛЬКО, ЕСЛИ ЗАПУСКАЕМ НА ЛОКАЛЬНОЙ МАШИНЕ БЕЗ ПОСТОЯННОГО ВНЕШНЕГО IP)
+  # cloudflare-tunnel:
+  #   image: cloudflare/cloudflared:latest
+  #   restart: always
+  #   command: tunnel --protocol http2 --url http://ntfy-server:80
+
+volumes:
+  clickhouse_data:
+  pgdata:
+  ntfy-data:
+  kafka_data:
+
+networks:
+  monitoring-network:
+    driver: bridge

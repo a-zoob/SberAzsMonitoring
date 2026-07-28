@@ -1,0 +1,17 @@
+## User-specific files
+.vs/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+x86/
+b囊囊/
+[Bb]in/
+[Oo]bj/

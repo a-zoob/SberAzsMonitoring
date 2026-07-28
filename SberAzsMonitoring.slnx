@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ApiGateway/ApiGateway.csproj" />
+    <Project Path="src/Application/Application.csproj" />
+    <Project Path="src/ClickHouseWorker/ClickHouseWorker.csproj" Id="ad4842fa-e0ff-473c-b99f-f225eec535b0" />
+    <Project Path="src/Domain/Domain.csproj" />
+    <Project Path="src/Infrastructure/Infrastructure.csproj" />
+    <Project Path="src/NotificationWorker/NotificationWorker.csproj" Id="41931ca4-8549-44d7-9334-0c9722ba207b" />
+    <Project Path="src/SberAzsMonitoring.Dashboard.Application/SberAzsMonitoring.Dashboard.Application.csproj" Id="3b19075c-efdb-4322-b9b6-cdb460bb9e28" />
+    <Project Path="src/SberAzsMonitoring.Dashboard.Domain/SberAzsMonitoring.Dashboard.Domain.csproj" Id="15f3cf04-4c31-40e6-90cb-3af912df33c6" />
+    <Project Path="src/SberAzsMonitoring.Dashboard.Infrastructure/SberAzsMonitoring.Dashboard.Infrastructure.csproj" Id="fd66df1d-13ef-4fe2-8fbc-1a1f1984a4c2" />
+    <Project Path="src/WebApi/WebApi.csproj" />
+  </Folder>
+  <Folder Name="/Элементы решения/">
+    <File Path=".dockerignore" />
+    <File Path="docker-compose.yml" />
+  </Folder>
+  <Project Path="src/SberAzsMonitoring.Dashboard.Api/SberAzsMonitoring.Dashboard.Api.csproj" />
+</Solution>
