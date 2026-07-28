@@ -52,7 +52,7 @@ public sealed class ProcessFuelSnapshotUseCase
             _httpClient.BaseAddress = new Uri(baseUrlStr);
         }
 
-        string rawTitle = $" Изменение цен АЗС [{regionName}]";
+        string rawTitle = $" Наличие бензнина на АЗС [{regionName}]";
         string base64Title = Convert.ToBase64String(Encoding.UTF8.GetBytes(rawTitle));
         string encodedTitle = $"=?utf-8?B?{base64Title}?=";
 
