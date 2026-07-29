@@ -1,0 +1,58 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SberAzsMonitoring</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Боковое навигационное меню -->
+        <nav id="sidebar">
+            <!-- Верхняя часть меню с логотипом/названием -->
+            <div class="p-3 d-flex align-items-center justify-content-between border-bottom border-secondary">
+                <span class="fw-bold sidebar-text">SberAzs Monitoring</span>
+                <!-- Кнопка-сэндвич для мгновенного переключения классов на клиенте -->
+                <button type="button" class="btn btn-sm btn-dark text-white border-0" id="sidebarToggle">
+                    ☰
+                </button>
+            </div>
+
+            <!-- Ссылки на разделы панели -->
+            <div class="list-group list-group-flush flex-grow-1">
+                <a href="@Url.Action("Index", "Analytics")" class="sidebar-link active">
+                    <span class="sidebar-icon">📊</span>
+                    <span class="sidebar-text">Доступность АЗС</span>
+                </a>
+            </div>
+
+            <div class="p-3 text-muted border-top border-secondary text-center small">
+                <span class="sidebar-text">v1.0 (2026)</span>
+            </div>
+        </nav>
+
+        <!-- Главная рабочая область контента -->
+        <main class="main-content">
+            <div class="container-fluid">
+                @RenderBody()
+            </div>
+        </main>
+    </div>
+
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        document.getElementById('sidebarToggle').addEventListener('click', function () {
+        document.getElementById('sidebar').classList.toggle('collapsed');
+        });
+    </script>
+
+    <!-- Подключение скрипта аналитики (Fetch API и графики) -->
+    <script src="~/js/dashboard-analytics.js" asp-append-version="true"></script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

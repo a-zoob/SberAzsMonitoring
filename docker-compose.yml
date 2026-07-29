@@ -196,9 +196,10 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DashboardDb=Host=sberazs-postgres;Port=5432;Database=sberazs_dashboard_db;Username=postgres;Password=your_secure_db_password_here;
+      - ConnectionStrings__ClickhouseConnection=Host=clickhouse;Port=8123;Database=default;User=default;Password=sberazs_pass
       # КОНФИГУРАЦИЯ KAFKA ДЛЯ СИНХРОНИЗАЦИИ ФИРМ
-      # Задайте имя переменной окружения в соответствии с тем, как она читается в вашей AddDashboardInfrastructure 
-      # (например, KafkaSettings__BootstrapServers или KafkaBootstrapServers)
+      # Задайте имя переменной окружения в соответствии с тем, как она читается в AddDashboardInfrastructure 
+      # (KafkaSettings__BootstrapServers)
       - KafkaSettings__BootstrapServers=kafka:29092
       - IdentitySettings__EnableManagementFeatures=true
       - IdentitySettings__SeedAdminLogin=admin
@@ -208,8 +209,6 @@ services:
     restart: always
     networks:
       - monitoring-network
-
-
 
   # 8. Реляционная СУБД для хранения настроек Дашборда (Enterprise Production)
   sberazs-postgres:
@@ -229,6 +228,33 @@ services:
     networks:
       - monitoring-network
 
+  sberazs-dashboard-mvc:
+    image: sberazs-dashboard-mvc:latest
+    container_name: sberazs-dashboard-mvc
+    build:
+      context: .
+      dockerfile: src/SberAzsMonitoring.Dashboard.Mvc/Dockerfile
+    ports:
+      - "7300:8080"
+    user: "0"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - BackendApiSettings__BaseUrl=http://sberazs-dashboard-api:8080/
+      - DataProtection__KeysPath=/home/app/.aspnet/DataProtection-Keys
+    networks:
+      - monitoring-network
+    depends_on:
+      - sberazs-dashboard-api
+     # Монтируем папку для ключей ASP.NET Core
+    volumes:
+      - dpmvc-keys:/home/app/.aspnet/DataProtection-Keys
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   # # Туннель наружу (ТОЛЬКО, ЕСЛИ ЗАПУСКАЕМ НА ЛОКАЛЬНОЙ МАШИНЕ БЕЗ ПОСТОЯННОГО ВНЕШНЕГО IP)
   # cloudflare-tunnel:
   #   image: cloudflare/cloudflared:latest
@@ -240,7 +266,9 @@ volumes:
   pgdata:
   ntfy-data:
   kafka_data:
-
+  volumes:
+  dpmvc-keys:
+  
 networks:
   monitoring-network:
     driver: bridge

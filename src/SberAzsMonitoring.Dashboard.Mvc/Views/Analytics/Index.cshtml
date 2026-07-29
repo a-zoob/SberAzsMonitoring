@@ -1,0 +1,104 @@
+﻿@{
+    ViewData["Title"] = "Мониторинг Доступности АЗС";
+    var regions = ViewBag.Regions as List<string> ?? new List<string>();
+    var fuelTypes = ViewBag.FuelTypes as List<string> ?? new List<string>();
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">📊 Аналитическая панель «SberAzsMonitoring»</h1>
+</div>
+
+@if (ViewBag.ErrorMessage != null)
+{
+    <div class="alert alert-danger" role="alert">
+        @ViewBag.ErrorMessage
+    </div>
+}
+
+<!-- Блок фильтрации данных -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-dark text-white fw-bold">Фильтры оперативного анализа</div>
+    <div class="card-body">
+        <form id="analyticsFilterForm" class="row g-3 align-items-end">
+            <!-- Выбор региона -->
+            <div class="col-md-4">
+                <label for="regionSelect" class="form-label fw-semibold">Регион:</label>
+                <select id="regionSelect" class="form-select" required>
+                    @if (!regions.Any())
+                    {
+                        <option value="">Данные регионов отсутствуют</option>
+                    }
+                    @foreach (var region in regions)
+                    {
+                        <option value="@region">@region</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Выбор марки топлива -->
+            <div class="col-md-4">
+                <label for="fuelTypeSelect" class="form-label fw-semibold">Марка топлива:</label>
+                <select id="fuelTypeSelect" class="form-select" required>
+                    @if (!fuelTypes.Any())
+                    {
+                        <option value="">Данные топлива отсутствуют</option>
+                    }
+                    @foreach (var fuel in fuelTypes)
+                    {
+                        <option value="@fuel">@fuel</option>
+                    }
+                </select>
+            </div>
+
+            <!-- Кнопка среза -->
+            <div class="col-md-4 d-grid">
+                <button type="submit" class="btn btn-success fw-bold" id="btnLoadData">
+                    ⚡ Показать данные за текущий момент
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+<!-- Контейнер для графика  -->
+<div class="card mb-4 shadow-sm">
+    <div class="card-header bg-secondary text-white fw-bold d-flex justify-content-between align-items-center">
+        <span>📈 График распределения ограничений по АЗС</span>
+        <span class="badge bg-light text-dark small" id="chartPeriodBadge">На текущий момент</span>
+    </div>
+    <div class="card-body bg-white" style="position: relative; height:320px;">
+        <!-- Сюда с помощью Vanilla JS будет рендериться визуализация -->
+        <div id="analyticsChartContainer" class="d-flex justify-content-center align-items-center h-100 text-muted">
+            Выполните загрузку для построения графика
+        </div>
+    </div>
+</div>
+
+<!-- Контейнер для таблицы  -->
+<div class="card shadow-sm">
+    <div class="card-header bg-secondary text-white fw-bold">📋 Срез доступности</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0" id="trafficLightTable">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col" style="width: 15%">Дата</th>
+                        <th scope="col" style="width: 20%">АЗС</th>
+                        <th scope="col" style="width: 15%">Топливо</th>
+                        <th scope="col" style="width: 25%">Статус наличия</th>
+                        <th scope="col" style="width: 25%">Ограничения / Объем</th>
+                    </tr>
+                </thead>
+                <tbody id="tableDataBody">
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            Выберите параметры выше и нажмите «Обновить данные»
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+

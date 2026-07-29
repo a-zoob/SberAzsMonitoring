@@ -8,6 +8,8 @@ using SberAzsMonitoring.Dashboard.Infrastructure.Cryptography;
 using SberAzsMonitoring.Dashboard.Infrastructure.Messaging;
 using SberAzsMonitoring.Dashboard.Infrastructure.Persistence;
 using System;
+using SberAzsMonitoring.Dashboard.Application.Common.Interfaces.Analytics;
+using SberAzsMonitoring.Dashboard.Infrastructure.Services.Analytics;
 
 namespace SberAzsMonitoring.Dashboard.Infrastructure;
 
@@ -34,13 +36,16 @@ public static class DependencyInjection
         // Регистрация службы публикации конфигураций фирм в шину брокера Kafka
         services.AddScoped<ITenantConfigurationPublisher, KafkaTenantConfigurationPublisher>();
 
-        // 3. Настройка пула HttpClient для изолированной службы авторизации ntfy (Clean Code)
+        // 3. Настройка пула HttpClient для службы авторизации ntfy (Clean Code)
         services.AddHttpClient<INtfyAuthService, NtfyAuthService>(client =>
         {
             string baseUrlStr = Environment.GetEnvironmentVariable("RegionSettings__NtfyBaseUrl") ?? "http://ntfy-server";
             client.BaseAddress = new Uri(baseUrlStr);
             client.Timeout = TimeSpan.FromSeconds(10);
         });
+
+        // 4. Регистрация репозитория аналитики ClickHouse
+        services.AddScoped<IClickHouseAnalyticsRepository, ClickHouseAnalyticsRepository>();
 
         return services;
     }

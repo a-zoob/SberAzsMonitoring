@@ -11,6 +11,8 @@ using SberAzsMonitoring.Dashboard.Infrastructure;
 using Scalar.AspNetCore;
 using System;
 using System.Text.Json;
+using SberAzsMonitoring.Dashboard.Api.Endpoints.Analytics;
+using SberAzsMonitoring.Dashboard.Application.UseCases.Analytics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +39,9 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddScoped<GetTenantCredentialsUseCase>();
+
+builder.Services.AddScoped<GetLatestFuelAvailabilityUseCase>();
+
 
 var app = builder.Build();
 
@@ -89,5 +94,6 @@ using (var scope = app.Services.CreateScope())
 // 3. Подключаем изолированные эндпоинты через класс-картограф
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
+app.MapAnalyticsEndpoints();
 
 app.Run();
