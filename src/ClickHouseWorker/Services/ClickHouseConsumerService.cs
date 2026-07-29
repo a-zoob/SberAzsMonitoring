@@ -86,7 +86,7 @@ public class ClickHouseConsumerService : BackgroundService
             }
             catch (ConsumeException ex) when (ex.Error.Code == ErrorCode.UnknownTopicOrPart)
             {
-                _logger.LogDebug("Один из топиков (Новгород) еще не создан на брокере. Ожидание...");
+                _logger.LogDebug("Один из топиков еще не создан на брокере. Ожидание...");
                 await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
             catch (Exception ex)
